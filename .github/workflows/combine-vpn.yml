@@ -1,33 +1,45 @@
 name: Combine VPN Lists
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 */6 * * *'
-  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   combine:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Download and combine VPN lists
         run: |
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" > combined.txt
+          echo "# TURBO - Germany, Finland, Netherlands, Poland" > combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> combined.txt
           echo "" >> combined.txt
+          
+          echo "# FAST - Czechia, Sweden" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> combined.txt
           echo "" >> combined.txt
+          
+          echo "# RESERVE - Turkey, Romania" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> combined.txt
           echo "" >> combined.txt
+          
+          echo "# SS - Multiple countries" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> combined.txt
           echo "" >> combined.txt
+          
+          echo "# CHEBUR - White lists" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
       
-      - name: Commit files
+      - name: Commit and push
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
           git add combined.txt
-          git commit -m "Auto-update VPN list" || echo "Nothing to commit"
-          git push
+          git commit -m "Auto-update VPN list $(date)" || true
+          git push origin main
           
