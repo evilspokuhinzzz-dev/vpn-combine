@@ -23,11 +23,11 @@ jobs:
           echo "" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
       
-      - name: Push to GitHub
+      - name: Commit files
         run: |
-          git config user.name "VPN Bot"
-          git config user.email "bot@vpn.local"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git add combined.txt
-          git commit -m "Auto-update VPN list $(date)" || true
+          git commit -m "Auto-update VPN list" || echo "Nothing to commit"
           git push
           
