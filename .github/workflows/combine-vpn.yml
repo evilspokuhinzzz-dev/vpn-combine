@@ -1,45 +1,181 @@
-name: Combine VPN Lists
+name: Combine VPN Lists - Optimized
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: '0 */6 * * *'
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
   combine:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       
       - name: Download and combine VPN lists
         run: |
-          echo "# TURBO - Germany, Finland, Netherlands, Poland" > combined.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> combined.txt
+          echo "⏬ Скачиваю TURBO список (Germany, Finland, Netherlands, Poland)..."
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" > combined.txt
           echo "" >> combined.txt
           
-          echo "# FAST - Czechia, Sweden" >> combined.txt
+          echo "⏬ Скачиваю FAST список (Czechia, Sweden)..."
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> combined.txt
           echo "" >> combined.txt
           
-          echo "# RESERVE - Turkey, Romania" >> combined.txt
+          echo "⏬ Скачиваю RESERVE список (Turkey, Romania)..."
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> combined.txt
           echo "" >> combined.txt
           
-          echo "# SS - Multiple countries" >> combined.txt
+          echo "⏬ Скачиваю SS список..."
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> combined.txt
           echo "" >> combined.txt
           
-          echo "# CHEBUR - White lists" >> combined.txt
+          echo "⏬ Скачиваю White список..."
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
       
-      - name: Commit and push
+      - name: Remove Russian servers
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
+          echo "🔍 ЭТАП 1: Удаляю все русские серверы..."
+          
+          # Удаляем содержащие Russia (все варианты)
+          sed -i '/[Rr]ussia/d' combined.txt
+          sed -i '/russia/d' combined.txt
+          
+          # Удаляем по городам (русский и англ)
+          sed -i '/Moscow\|moscow\|MOSCOW/d' combined.txt
+          sed -i '/Moscow 1\|Moscow 2\|Moscow 3\|Moscow 4\|Moscow 5\|Moscow 6\|Moscow 7\|Moscow 8\|Moscow 9/d' combined.txt
+          sed -i '/SPB\|spb\|St\.Petersburg\|saint petersburg\|peters/d' combined.txt
+          sed -i '/Yekaterinburg\|yekaterinburg\|ekaterinburg\|ekb\|EKB/d' combined.txt
+          sed -i '/Sochi\|sochi\|SOCHI/d' combined.txt
+          sed -i '/Novosibirsk\|novosibirsk\|novosib\|NOVOSIB/d' combined.txt
+          sed -i '/Vladivostok\|vladivostok\|vladiv\|VLADIV/d' combined.txt
+          sed -i '/Kazan\|kazan\|KAZAN/d' combined.txt
+          sed -i '/Krasnoyarsk\|krasnoyarsk\|krsk\|KRSK/d' combined.txt
+          sed -i '/Samara\|samara\|SAMARA/d' combined.txt
+          sed -i '/Omsk\|omsk\|OMSK/d' combined.txt
+          sed -i '/Ufa\|ufa\|UFA/d' combined.txt
+          sed -i '/Perm\|perm\|PERM/d' combined.txt
+          sed -i '/Voronezh\|voronezh\|VORONEZH/d' combined.txt
+          sed -i '/Rostov\|rostov\|ROSTOV/d' combined.txt
+          
+          # Удаляем русские сокращения и обозначения
+          sed -i '/\[Russia\]/d' combined.txt
+          sed -i '/\[мск\]\|\[спб\]\|\[екб\]\|\[рос\]/d' combined.txt
+          sed -i '/ мск \| спб \| екб \| рос /d' combined.txt
+          sed -i '/country=RU\|country=ru/d' combined.txt
+          sed -i '/RU\]\|ru\]/d' combined.txt
+          
+          # Удаляем доменные имена с .ru
+          sed -i '/\.ru["\x27]/d' combined.txt
+          sed -i '/\.ru\//d' combined.txt
+          
+          # Удаляем кириллицу (любые русские символы)
+          sed -i '/[а-яА-ЯёЁ]/d' combined.txt
+          
+          echo "✅ Русские серверы удалены"
+      
+      - name: Optimize for low bandwidth
+        run: |
+          echo "🔍 ЭТАП 2: Оптимизирую для 5 Мбит/с..."
+          
+          # Удаляем очень тяжелые конфиги (с заметными ID)
+          sed -i '/test\|debug\|benchmark/d' combined.txt
+          
+          # Оставляем только VLESS (быстрее чем Shadowsocks)
+          grep -i "^vless://" combined.txt > combined_temp.txt
+          mv combined_temp.txt combined.txt
+          
+          # Удаляем дублирующиеся конфиги (оставляем первый)
+          awk '!seen[$0]++' combined.txt > combined_temp.txt
+          mv combined_temp.txt combined.txt
+          
+          echo "✅ Оптимизация завершена (оставлены только VLESS)"
+      
+      - name: Remove empty lines and format
+        run: |
+          echo "🔍 ЭТАП 3: Очищаю и форматирую..."
+          
+          # Удаляем пустые строки
+          sed -i '/^[[:space:]]*$/d' combined.txt
+          
+          # Удаляем строки, содержащие только пробелы
+          sed -i '/^[[:space:]]+$/d' combined.txt
+          
+          # Удаляем дублирующиеся пустые строки
+          cat -s combined.txt > combined_temp.txt
+          mv combined_temp.txt combined.txt
+          
+          # Удаляем пробелы в конце строк
+          sed -i 's/[[:space:]]*$//' combined.txt
+          
+          echo "✅ Форматирование завершено"
+      
+      - name: Verify and show statistics
+        run: |
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "📊 ФИНАЛЬНАЯ СТАТИСТИКА"
+          echo "════════════════════════════════════════════════════"
+          echo ""
+          
+          TOTAL=$(wc -l < combined.txt)
+          echo "✅ Всего конфигов в файле: $TOTAL"
+          echo ""
+          
+          echo "📝 ПЕРВЫЕ 15 КОНФИГОВ:"
+          head -15 combined.txt | nl
+          echo ""
+          
+          echo "🔍 ПРОВЕРКА НА РУССКИЕ СЕРВЕРЫ:"
+          RUSSIAN_COUNT=$(grep -i "russia\|moscow\|spb\|peter\|ekb\|sochi\|novosib\|perm\|voronezh\|rostov\|[а-яА-ЯёЁ]" combined.txt | wc -l)
+          echo "Найдено русских: $RUSSIAN_COUNT (должно быть 0)"
+          
+          if [ "$RUSSIAN_COUNT" -gt 0 ]; then
+            echo ""
+            echo "⚠️ ПРЕДУПРЕЖДЕНИЕ! НАЙДЕНЫ РУССКИЕ СЕРВЕРЫ (первые 5):"
+            grep -i "russia\|moscow\|spb\|peter\|ekb\|sochi\|novosib\|perm\|voronezh\|rostov\|[а-яА-ЯёЁ]" combined.txt | head -5
+            echo ""
+          else
+            echo "✅✅✅ РУССКИЕ СЕРВЕРЫ ПОЛНОСТЬЮ УДАЛЕНЫ!"
+            echo ""
+          fi
+          
+          echo "🌍 ПРОВЕРКА ИНОСТРАННЫХ СЕРВЕРОВ:"
+          GERMANY=$(grep -ci "Germany\|DE" combined.txt)
+          FINLAND=$(grep -ci "Finland\|FI" combined.txt)
+          NETHERLANDS=$(grep -ci "Netherlands\|NL" combined.txt)
+          POLAND=$(grep -ci "Poland\|PL" combined.txt)
+          SWEDEN=$(grep -ci "Sweden\|SE" combined.txt)
+          TURKEY=$(grep -ci "Turkey\|TR" combined.txt)
+          ROMANIA=$(grep -ci "Romania\|RO" combined.txt)
+          CZECH=$(grep -ci "Czech\|CZ" combined.txt)
+          
+          echo "🇩🇪 Germany: $GERMANY"
+          echo "🇫🇮 Finland: $FINLAND"
+          echo "🇳🇱 Netherlands: $NETHERLANDS"
+          echo "🇵🇱 Poland: $POLAND"
+          echo "🇸🇪 Sweden: $SWEDEN"
+          echo "🇹🇷 Turkey: $TURKEY"
+          echo "🇷🇴 Romania: $ROMANIA"
+          echo "🇨🇿 Czech: $CZECH"
+          echo ""
+          echo "✅ Общее количество: $TOTAL конфигов"
+          echo ""
+          
+          if [ -s combined.txt ]; then
+            echo "✅ Файл создан успешно!"
+          else
+            echo "❌ ОШИБКА: Файл пустой!"
+            exit 1
+          fi
+          
+          echo "════════════════════════════════════════════════════"
+      
+      - name: Commit files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git add combined.txt
-          git commit -m "Auto-update VPN list $(date)" || true
-          git push origin main
+          git commit -m "⚡ Auto-update: Optimized VPN list (RU removed, VLESS only, low-bandwidth) - $(date +%Y-%m-%d\ %H:%M)" || echo "Nothing to commit"
+          git push
           
