@@ -37,11 +37,8 @@ jobs:
         run: |
           echo "🔍 ЭТАП 1: Удаляю все русские серверы..."
           
-          # Удаляем содержащие Russia (все варианты)
           sed -i '/[Rr]ussia/d' combined.txt
           sed -i '/russia/d' combined.txt
-          
-          # Удаляем по городам (русский и англ)
           sed -i '/Moscow\|moscow\|MOSCOW/d' combined.txt
           sed -i '/Moscow 1\|Moscow 2\|Moscow 3\|Moscow 4\|Moscow 5\|Moscow 6\|Moscow 7\|Moscow 8\|Moscow 9/d' combined.txt
           sed -i '/SPB\|spb\|St\.Petersburg\|saint petersburg\|peters/d' combined.txt
@@ -57,19 +54,13 @@ jobs:
           sed -i '/Perm\|perm\|PERM/d' combined.txt
           sed -i '/Voronezh\|voronezh\|VORONEZH/d' combined.txt
           sed -i '/Rostov\|rostov\|ROSTOV/d' combined.txt
-          
-          # Удаляем русские сокращения и обозначения
           sed -i '/\[Russia\]/d' combined.txt
           sed -i '/\[мск\]\|\[спб\]\|\[екб\]\|\[рос\]/d' combined.txt
           sed -i '/ мск \| спб \| екб \| рос /d' combined.txt
           sed -i '/country=RU\|country=ru/d' combined.txt
           sed -i '/RU\]\|ru\]/d' combined.txt
-          
-          # Удаляем доменные имена с .ru
           sed -i '/\.ru["\x27]/d' combined.txt
           sed -i '/\.ru\//d' combined.txt
-          
-          # Удаляем кириллицу (любые русские символы)
           sed -i '/[а-яА-ЯёЁ]/d' combined.txt
           
           echo "✅ Русские серверы удалены"
@@ -78,14 +69,11 @@ jobs:
         run: |
           echo "🔍 ЭТАП 2: Оптимизирую для 5 Мбит/с..."
           
-          # Удаляем очень тяжелые конфиги (с заметными ID)
           sed -i '/test\|debug\|benchmark/d' combined.txt
           
-          # Оставляем только VLESS (быстрее чем Shadowsocks)
           grep -i "^vless://" combined.txt > combined_temp.txt
           mv combined_temp.txt combined.txt
           
-          # Удаляем дублирующиеся конфиги (оставляем первый)
           awk '!seen[$0]++' combined.txt > combined_temp.txt
           mv combined_temp.txt combined.txt
           
@@ -95,17 +83,10 @@ jobs:
         run: |
           echo "🔍 ЭТАП 3: Очищаю и форматирую..."
           
-          # Удаляем пустые строки
           sed -i '/^[[:space:]]*$/d' combined.txt
-          
-          # Удаляем строки, содержащие только пробелы
           sed -i '/^[[:space:]]+$/d' combined.txt
-          
-          # Удаляем дублирующиеся пустые строки
           cat -s combined.txt > combined_temp.txt
           mv combined_temp.txt combined.txt
-          
-          # Удаляем пробелы в конце строк
           sed -i 's/[[:space:]]*$//' combined.txt
           
           echo "✅ Форматирование завершено"
