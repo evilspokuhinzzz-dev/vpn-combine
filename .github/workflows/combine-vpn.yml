@@ -1,4 +1,4 @@
-name: VPN NO Russia (WORKING)
+name: VPN NO Russia (ULTRA SIMPLE)
 
 on:
   schedule:
@@ -11,35 +11,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download + NO Russia Filter
+      - name: Generate NO Russia VPN
         run: |
-          rm -f combined.txt && touch combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -E '^vless://|^ss://' | grep -Ev '#Russia|sbrf|Moscow|russia|русс|RU:|5.188|109.120' > combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" | grep -E '^vless://|^ss://' | grep -Ev '#Russia|sbrf|Moscow|russia|русс|RU:|5.188|109.120' >> combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" | grep -E '^vless://|^ss://' | grep -Ev '#Russia|sbrf|Moscow|russia|русс|RU:|5.188|109.120' >> combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" | grep -E '^vless://|^ss://' | grep -Ev '#Russia|sbrf|Moscow|russia|русс|RU:|5.188|109.120' >> combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" | grep -E '^vless://|^ss://' | grep -Ev '#Russia|sbrf|Moscow|russia|русс|RU:|5.188|109.120' >> combined.txt
           
-          # ФИЛЬТР: configs → NO RU → файл
-          process_list() {
-            curl -s "$1" | grep '^vless://|^ss://|^vmess://' | grep -v binary | grep -Ev '#Russia|sbrf|Moscow|5.188.|109.120.|95.85.|russia|русс|RU:|russ.|miner' >> combined.txt
-          }
+          echo "=== ГОТОВО ==="
+          lines=$(wc -l < combined.txt)
+          echo "Configs: $lines"
+          echo "RU check:"
+          grep -c '#Russia' combined.txt || echo "0"
           
-          process_list "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland"
-          echo "" >> combined.txt
-          process_list "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden"
-          echo "" >> combined.txt
-          process_list "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania"
-          echo "" >> combined.txt
-          process_list "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia"
-          echo "" >> combined.txt
-          process_list "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt"
-          
-          # ПРОВЕРКА
-          echo "=== РЕЗУЛЬТАТ ==="
-          wc -l combined.txt
-          echo "RU проверка:"
-          grep -c '#Russia|sbrf|Moscow' combined.txt || echo "0 RU найдено ✅"
-      
       - name: Commit
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add combined.txt
-          git commit -m "NO Russia working [$(date)]" || echo "No changes"
+          git commit -m "ULTRA SIMPLE NO Russia [$(date)]" || echo "No changes"
           git push
