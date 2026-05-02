@@ -1,4 +1,4 @@
-name: Combine VPN Lists (MINIMAL FILTER)
+name: Combine VPN Lists (FINAL NO Russia)
 
 on:
   schedule:
@@ -11,18 +11,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Download and combine (NO Russia)
+      - name: Download and combine NO Russia
         run: |
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -v Russia > temp1.txt
-          echo "" >> temp1.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" | grep -v Russia >> temp1.txt
-          echo "" >> temp1.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" | grep -v Russia >> temp1.txt
-          echo "" >> temp1.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" | grep -v Russia >> temp1.txt
-          echo "" >> temp1.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" | grep -v Russia >> temp1.txt
-          mv temp1.txt combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -v Russia || true > combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" | grep -v Russia || true >> combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" | grep -v Russia || true >> combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" | grep -v Russia || true >> combined.txt
+          echo "" >> combined.txt
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" | grep -v Russia || true >> combined.txt
+          
+          echo "=== СТАТИСТИКА ==="
+          wc -l combined.txt
       
       - name: Commit files
         run: |
