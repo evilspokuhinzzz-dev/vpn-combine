@@ -1,4 +1,4 @@
-name: Combine VPN Lists (NO Russia)
+name: Combine VPN Lists (NO Russia SUPER)
 
 on:
   schedule:
@@ -9,40 +9,56 @@ jobs:
   combine:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # Обновили на v4 (убирает warning)
+      - uses: actions/checkout@v4
       
-      - name: Download and combine VPN lists (filtered NO Russia)
+      - name: Download + SUPER FILTER NO Russia
         run: |
-          # Очищаем файл перед началом
+          # ОЧИСТКА
           > combined.txt
           
-          # 1. TURBO: Germany|Finland|Netherlands|Poland (удаляем Russia)
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -Ev "(russia|русс|5.188|109.120|miner|RU:)" >> combined.txt
+          # ФУНКЦИЯ СУПЕРФИЛЬТРА (удаляет RU IP/host)
+          filter_no_ru() {
+            curl -s "$1" | grep -E '^vless://|^ss://|^vmess://' | \
+            grep -Ev '(
+              5.188.|109.120.|95.85.|31.31.|46.62.|176.96.|2.60.|78.25.|
+              92.53.|213.228.|212.48.|217.107.|194.58.|194.67.|
+              russia|русс|РУС|RU:|russ.|miner|anti-vpn.ru|
+              %F0%9F%87%B7%F0%9F%87%BA
+            )' | grep -v binary
+          }
+          
+          # 1. TURBO
+          filter_no_ru "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> combined.txt
           echo "" >> combined.txt
           
-          # 2. FAST: Czechia|Sweden (удаляем Russia)
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" | grep -Ev "(russia|русс|5.188|109.120|miner|RU:)" >> combined.txt
+          # 2. FAST
+          filter_no_ru "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> combined.txt
           echo "" >> combined.txt
           
-          # 3. RESERVE: Turkey|Romania (удаляем Russia)
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" | grep -Ev "(russia|русс|5.188|109.120|miner|RU:)" >> combined.txt
+          # 3. RESERVE
+          filter_no_ru "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> combined.txt
           echo "" >> combined.txt
           
-          # 4. SS: Germany|Finland|Netherlands|Poland|Sweden|Czechia (удаляем Russia)
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" | grep -Ev "(russia|русс|5.188|109.120|miner|RU:)" >> combined.txt
+          # 4. SS ALL
+          filter_no_ru "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> combined.txt
           echo "" >> combined.txt
           
-          # 5. CHEBUR: White lists (удаляем Russia)
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" | grep -Ev "(russia|русс|5.188|109.120|miner|RU:|russ.)" >> combined.txt
+          # 5. WHITE (самый "русский" — жёсткий фильтр)
+          filter_no_ru "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
           
-          # Показываем статистику (сколько строк добавлено)
-          echo "=== СТАТИСТИКА ==="
-          wc -l combined.txt
+          # СТАТИСТИКА
+          echo "=== СУПЕРФИЛЬТР Готово ==="
+          LINES=$(wc -l < combined.txt)
+          echo "Конфигов: $LINES (только НЕ Россия)"
+          
+          # ПРОВЕРКА НА RU (должно быть 0)
+          RU_CHECK=$(grep -c -E '(5.188|109.120|95.85|russia|русс)' combined.txt)
+          echo "RU серверов оставлено: $RU_CHECK (должно быть 0!)"
       
-      - name: Commit files
+      - name: Commit
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add combined.txt
-          git commit -m "Auto-update VPN list (NO Russia) [$(date)]" || echo "Nothing to commit"
+          git commit -m "SUPER NO Russia ($LINES configs) [$(date)]" || echo "No changes"
           git push
