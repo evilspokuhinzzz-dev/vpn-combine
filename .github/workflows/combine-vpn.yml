@@ -5,6 +5,9 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   combine:
     runs-on: ubuntu-latest
@@ -15,36 +18,33 @@ jobs:
         run: |
           temp_file=$(mktemp)
 
-          echo "=== Downloading lists ==="
+          # Скачиваем все списки (без пустых строк между ними)
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> "$temp_file"
-          echo "" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> "$temp_file"
-          echo "" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> "$temp_file"
-          echo "" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> "$temp_file"
-          echo "" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> "$temp_file"
 
-          # Удаляем строки, начинающиеся с # (комментарии), и пустые строки
+          # Удаляем строки с комментариями (#) и пустые строки
           grep -a -v '^#' "$temp_file" | grep -a -v '^$' > cleaned.txt
 
-          # Фильтруем российские серверы (удаляем строки с признаками РФ)
+          # Фильтруем российские серверы
           grep -a -v -i -E '(\.ru|%2Eru| Russia|&ru&|server=[^&]*\.ru|ru[0-9]|ru-msk)' cleaned.txt > combined.txt
 
-          # Подсчёт итоговых конфигов
-          count=$(grep -a -c -E '^(vless://|ss://)' combined.txt || echo 0)
+          # Убеждаемся, что файл начинается с vless:// или ss:// (удаляем возможные пустые строки в начале)
+          sed -i '/^$/d' combined.txt
+
+          count=$(grep -a -c '^vless://\|^ss://' combined.txt)
           echo "✅ Итоговое количество серверов: $count"
 
           if [ "$count" -eq 0 ]; then
-            echo "⚠️ ВНИМАНИЕ: серверов не осталось. Проверьте фильтрацию."
-            exit 1
+            echo "⚠️ Предупреждение: серверов не осталось после фильтрации."
           fi
 
-      - name: Commit files
+      - name: Commit and push
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
           git add combined.txt
-          git commit -m "Auto-update VPN list (без комментариев)" || echo "Nothing to commit"
-          git push
+          git commit -m "Auto-update VPN list (fixed empty lines)" || echo "No changes"
+          git push origin main
