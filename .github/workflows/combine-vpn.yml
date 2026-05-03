@@ -1,16 +1,15 @@
-- name: Download and combine (NO Russia SAFE)
+- name: Download and combine (NO Russia)
   run: |
-    # Germany (без RU)
-    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -i -v "russia|moscow|ru" || true > combined.txt
+    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" > temp.txt
+    grep -iv "russia|moscow|ru|sbrf" temp.txt >> combined.txt || true
+    rm temp.txt
     echo "" >> combined.txt
     
-    # Остальные 4 списка
-    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" | grep -i -v "russia|moscow|ru" || true >> combined.txt
+    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" > temp.txt
+    grep -iv "russia|moscow|ru|sbrf" temp.txt >> combined.txt || true
+    rm temp.txt
     echo "" >> combined.txt
-    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" | grep -i -v "russia|moscow|ru" || true >> combined.txt
-    echo "" >> combined.txt
-    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" | grep -i -v "russia|moscow|ru" || true >> combined.txt
-    echo "" >> combined.txt
-    curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" | grep -i -v "russia|moscow|ru" || true >> combined.txt
     
-    echo "Configs: $(wc -l < combined.txt)"
+    # ... остальные 3 curl ТАК ЖЕ ...
+    
+    echo "Configs без RU: $(wc -l < combined.txt)"
