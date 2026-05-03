@@ -1,4 +1,4 @@
-name: Combine VPN Lists (FINAL NO Russia)
+name: Combine VPN Lists (Hiddify Format)
 
 on:
   schedule:
@@ -11,9 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Download and combine NO Russia
+      - name: Generate Hiddify TXT
         run: |
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -v Russia || true > combined.txt
+          # HIDDIFY МЕТАДАННЫЕ (обязательно!)
+          echo "#profile-name: VPN NO Russia" > combined.txt
+          echo "#profile-update-interval: 6" >> combined.txt
+          echo "#profile-web-page-url: https://github.com/evilspokuhinzzz-dev/vpn-combine" >> combined.txt
+          echo "# Количество: auto" >> combined.txt
+          echo "" >> combined.txt
+          
+          # VPN configs (ваш рабочий код)
+          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" | grep -v Russia || true >> combined.txt
           echo "" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" | grep -v Russia || true >> combined.txt
           echo "" >> combined.txt
@@ -23,13 +31,13 @@ jobs:
           echo "" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" | grep -v Russia || true >> combined.txt
           
-          echo "=== СТАТИСТИКА ==="
+          echo "=== Hiddify Ready ==="
           wc -l combined.txt
       
-      - name: Commit files
+      - name: Commit
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add combined.txt
-          git commit -m "Auto-update NO Russia [$(date)]" || echo "Nothing to commit"
+          git commit -m "Hiddify format + metadata [$(date)]" || echo "No changes"
           git push
