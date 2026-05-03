@@ -18,27 +18,35 @@ jobs:
         run: |
           temp_file=$(mktemp)
 
-          # Скачиваем все списки (без пустых строк между ними)
+          # Скачиваем все списки
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> "$temp_file"
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> "$temp_file"
 
-          # Удаляем строки с комментариями (#) и пустые строки
+          # Удаляем комментарии и пустые строки
           grep -a -v '^#' "$temp_file" | grep -a -v '^$' > cleaned.txt
 
-          # Фильтруем российские серверы
-          grep -a -v -i -E '(\.ru|%2Eru| Russia|&ru&|server=[^&]*\.ru|ru[0-9]|ru-msk)' cleaned.txt > combined.txt
+          # Удаляем российские серверы (расширенный список паттернов)
+          grep -a -v -i -E '(\.ru|%2Eru| Russia|&ru&|server=[^&]*\.ru|ru[0-9]|ru-msk|Россия|Russian Federation|Moscow|Saint Petersburg|Russia\)|%D0%A0%D0%A4|country\.ru)' cleaned.txt > temp_filtered.txt
 
-          # Убеждаемся, что файл начинается с vless:// или ss:// (удаляем возможные пустые строки в начале)
+          # Дополнительная фильтрация: удаляем строки, где в названии страны есть флаг РФ (эмодзи) или слово Russia
+          grep -a -v -E '\xF0\x9F\x87\xB7\xF0\x9F\x87\xBA' temp_filtered.txt > combined.txt
+          
+          # Оставляем только строки, начинающиеся с известных протоколов
+          grep -a -E '^(vless://|ss://|vmess://|trojan://|hysteria2://)' combined.txt > final.txt
+          mv final.txt combined.txt
+
+          # Удаляем возможные пустые строки в начале/конце
           sed -i '/^$/d' combined.txt
 
-          count=$(grep -a -c '^vless://\|^ss://' combined.txt)
-          echo "✅ Итоговое количество серверов: $count"
+          count=$(grep -c -E '^(vless://|ss://|vmess://|trojan://|hysteria2://)' combined.txt || echo 0)
+          echo "✅ Итоговое количество серверов (без РФ): $count"
 
           if [ "$count" -eq 0 ]; then
-            echo "⚠️ Предупреждение: серверов не осталось после фильтрации."
+            echo "⚠️ Предупреждение: серверов не осталось после фильтрации. Копируем неотфильтрованный файл для отладки."
+            cp cleaned.txt combined.txt
           fi
 
       - name: Commit and push
@@ -46,5 +54,5 @@ jobs:
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add combined.txt
-          git commit -m "Auto-update VPN list (fixed empty lines)" || echo "No changes"
+          git commit -m "Auto-update VPN list (усиленная фильтрация РФ)" || echo "No changes"
           git push origin main
