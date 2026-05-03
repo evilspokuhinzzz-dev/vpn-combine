@@ -9,41 +9,59 @@ jobs:
   combine:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4   # лучше сразу v4 (Node.js 24 совместим)
+      - uses: actions/checkout@v4
 
       - name: Download and combine VPN lists
         run: |
-          # Временный файл со всеми конфигами
           temp_file=$(mktemp)
 
-          # Скачиваем все списки
+          echo "=== Downloading list 1 (VLESS Germany,Finland,Netherlands,Poland) ==="
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> "$temp_file"
           echo "" >> "$temp_file"
+
+          echo "=== Downloading list 2 (VLESS Czechia,Sweden) ==="
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> "$temp_file"
           echo "" >> "$temp_file"
+
+          echo "=== Downloading list 3 (SS Turkey,Romania) ==="
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> "$temp_file"
           echo "" >> "$temp_file"
+
+          echo "=== Downloading list 4 (SS Germany,Finland,Netherlands,Poland,Sweden,Czechia) ==="
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> "$temp_file"
           echo "" >> "$temp_file"
+
+          echo "=== Downloading list 5 (White lists) ==="
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> "$temp_file"
 
-          # ФИЛЬТРАЦИЯ: удаляем строки, содержащие российские серверы
-          # Убираем домены .ru, слово Russia, а также параметр server=*ru
-          grep -v -i -E '(\.ru|%2Eru| Russia|^ru\&|&ru\&|server=[^&]*\.ru)' "$temp_file" > combined.txt
-
-          # Проверка – не удалили ли всё?
-          if [ ! -s combined.txt ]; then
-            echo "⚠️ ВНИМАНИЕ: после фильтрации не осталось ни одного сервера!"
-            echo "Пожалуйста, проверьте шаблон фильтрации."
+          # Проверка, что файл не пустой
+          if [ ! -s "$temp_file" ]; then
+            echo "❌ Ничего не скачалось. Все источники недоступны."
             exit 1
           fi
 
-          echo "✅ Осталось $(grep -c '^vless\|^ss' combined.txt) серверов (российские удалены)"
+          # Подсчёт исходного количества конфигов (флаг -a принудительно текстовый режим)
+          original_count=$(grep -a -c -E '^(vless://|ss://)' "$temp_file" || echo 0)
+          echo "📥 Скачано строк с конфигами (до фильтрации): $original_count"
+
+          # ФИЛЬТРАЦИЯ: удаляем российские серверы (ключ -a = force text)
+          grep -a -v -i -E '(\.ru|%2Eru| Russia|&ru&|server=[^&]*\.ru|ru[0-9]|ru-msk)' "$temp_file" > combined.txt
+
+          # Подсчёт после фильтрации
+          final_count=$(grep -a -c -E '^(vless://|ss://)' combined.txt || echo 0)
+          echo "✅ Осталось после фильтрации РФ: $final_count"
+
+          # Если после фильтрации не осталось ни одного сервера – копируем оригинал для отладки
+          if [ "$final_count" -eq 0 ]; then
+            echo "⚠️ ВНИМАНИЕ: после фильтрации не осталось ни одного сервера!"
+            echo "Сохраняю нефильтрованный файл для диагностики (вы увидите российские серверы)"
+            cp "$temp_file" combined.txt
+          fi
 
       - name: Commit files
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add combined.txt
-          git commit -m "Auto-update VPN list (фильтр RU удалён)" || echo "Nothing to commit"
+          git commit -m "Auto-update VPN list (фильтр RU + debug)" || echo "Nothing to commit"
           git push
