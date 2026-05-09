@@ -1,4 +1,4 @@
-name: Combine VPN Lists with Fallback
+name: Combine VPN Lists with Fallback CDN
 
 on:
   workflow_dispatch:
@@ -14,30 +14,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download and combine VPN lists
+      - name: Download and combine VPN lists with fallback CDNs
         run: |
+          # Функция для скачивания через несколько CDN (fallback)
+          download_with_fallback() {
+            local FILENAME=$1
+            local URL_FASTLY=$2
+            local URL_GCORE=$3
+            local URL_RAW=$4
+            
+            # Пытаемся скачать через fastly, если ошибка — через gcore, потом через raw
+            curl -sL "$URL_FASTLY" -o "$FILENAME" && return 0
+            echo "⚠️ Fastly failed for $FILENAME, trying Gcore..."
+            curl -sL "$URL_GCORE" -o "$FILENAME" && return 0
+            echo "⚠️ Gcore failed for $FILENAME, trying Raw..."
+            curl -sL "$URL_RAW" -o "$FILENAME" && return 0
+            echo "❌ All CDNs failed for $FILENAME"
+            return 1
+          }
+          
+          # Функция для добавления секции (только если файл не пуст)
+          add_section() {
+            local TITLE=$1
+            local FILENAME=$2
+            
+            if [ -s "$FILENAME" ]; then
+              echo "" >> combined.txt
+              echo "# --- $TITLE ---" >> combined.txt
+              cat "$FILENAME" >> combined.txt
+              echo "✅ Section $TITLE added ($(wc -l < $FILENAME) lines)"
+            else
+              echo "⚠️ Section $TITLE is empty, skipping"
+            fi
+          }
+          
+          # =============================================
+          # ЗАГОЛОВОК ФАЙЛА
+          # =============================================
+          echo "# ==========================================" > combined.txt
+          echo "# AUTO-GENERATED VPN LIST" >> combined.txt
+          echo "# Updated: $(date -u +"%Y-%m-%d %H:%M UTC")" >> combined.txt
+          echo "# ==========================================" >> combined.txt
+          
           # =============================================
           # 1. ЕВРОПЕЙСКИЕ СЕРВЕРЫ (с фильтрами) – скорость
           # =============================================
-          echo "# ==========================================" > combined.txt
+          echo "" >> combined.txt
+          echo "# ==========================================" >> combined.txt
           echo "# EUROPEAN SERVERS (Filtered) – Speed & Unblock" >> combined.txt
           echo "# ==========================================" >> combined.txt
           
-          echo "" >> combined.txt
-          echo "# --- TURBO: Germany, Finland, Netherlands, Poland ---" >> combined.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> combined.txt
-          echo "" >> combined.txt
+          # TURBO
+          download_with_fallback "turbo.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt"
+          add_section "TURBO: Germany, Finland, Netherlands, Poland" "turbo.txt"
           
-          echo "# --- FAST: Czechia, Sweden ---" >> combined.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> combined.txt
-          echo "" >> combined.txt
+          # FAST
+          download_with_fallback "fast.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt"
+          add_section "FAST: Czechia, Sweden" "fast.txt"
           
-          echo "# --- RESERVE: Turkey, Romania ---" >> combined.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> combined.txt
-          echo "" >> combined.txt
+          # RESERVE
+          download_with_fallback "reserve.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS+All_RUS.txt"
+          add_section "RESERVE: Turkey, Romania" "reserve.txt"
           
-          echo "# --- SS: Multiple EU countries ---" >> combined.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> combined.txt
+          # SS
+          download_with_fallback "ss.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS+All_RUS.txt"
+          add_section "SS: Multiple EU countries" "ss.txt"
           
           # =============================================
           # 2. БЕЛЫЕ СПИСКИ (чистые IP для AI/Gemini)
@@ -47,9 +100,11 @@ jobs:
           echo "# WHITE LISTS (Clean IPs) – For AI Services" >> combined.txt
           echo "# ==========================================" >> combined.txt
           
-          echo "" >> combined.txt
-          echo "# --- CHEBUR: White lists (filtered EU) ---" >> combined.txt
-          curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
+          download_with_fallback "white.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt"
+          add_section "CHEBUR: White lists (filtered EU)" "white.txt"
           
           # =============================================
           # 3. РОССИЙСКИЕ СЕРВЕРЫ (без фильтров) – «чебурнет»
@@ -59,14 +114,15 @@ jobs:
           echo "# RUSSIAN SERVERS (No Filter) – Cheburnet Fallback" >> combined.txt
           echo "# ==========================================" >> combined.txt
           
-          echo "" >> combined.txt
-          echo "# --- RESCUE: All White-Lists (including RU) ---" >> combined.txt
-          curl -s "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
+          download_with_fallback "rescue.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt"
+          add_section "RESCUE: All White-Lists (including RU)" "rescue.txt"
       
       - name: Commit and push
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
           git add combined.txt
-          git commit -m "Auto-update VPN list $(date)" || true
-          git push origin main
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update VPN list $(date -u +"%Y-%m-%d %H:%M UTC")" && git push origin main)
