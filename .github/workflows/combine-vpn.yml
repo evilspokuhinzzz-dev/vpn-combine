@@ -1,4 +1,4 @@
-name: Combine VPN Lists
+name: Combine VPN Lists with Fallback
 
 on:
   workflow_dispatch:
@@ -16,24 +16,52 @@ jobs:
       
       - name: Download and combine VPN lists
         run: |
-          echo "# TURBO - Germany, Finland, Netherlands, Poland" > combined.txt
+          # =============================================
+          # 1. ЕВРОПЕЙСКИЕ СЕРВЕРЫ (с фильтрами) – скорость
+          # =============================================
+          echo "# ==========================================" > combined.txt
+          echo "# EUROPEAN SERVERS (Filtered) – Speed & Unblock" >> combined.txt
+          echo "# ==========================================" >> combined.txt
+          
+          echo "" >> combined.txt
+          echo "# --- TURBO: Germany, Finland, Netherlands, Poland ---" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" >> combined.txt
           echo "" >> combined.txt
           
-          echo "# FAST - Czechia, Sweden" >> combined.txt
+          echo "# --- FAST: Czechia, Sweden ---" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" >> combined.txt
           echo "" >> combined.txt
           
-          echo "# RESERVE - Turkey, Romania" >> combined.txt
+          echo "# --- RESERVE: Turkey, Romania ---" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Turkey%7CRomania" >> combined.txt
           echo "" >> combined.txt
           
-          echo "# SS - Multiple countries" >> combined.txt
+          echo "# --- SS: Multiple EU countries ---" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland%7CSweden%7CCzechia" >> combined.txt
-          echo "" >> combined.txt
           
-          echo "# CHEBUR - White lists" >> combined.txt
+          # =============================================
+          # 2. БЕЛЫЕ СПИСКИ (чистые IP для AI/Gemini)
+          # =============================================
+          echo "" >> combined.txt
+          echo "# ==========================================" >> combined.txt
+          echo "# WHITE LISTS (Clean IPs) – For AI Services" >> combined.txt
+          echo "# ==========================================" >> combined.txt
+          
+          echo "" >> combined.txt
+          echo "# --- CHEBUR: White lists (filtered EU) ---" >> combined.txt
           curl -s "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
+          
+          # =============================================
+          # 3. РОССИЙСКИЕ СЕРВЕРЫ (без фильтров) – «чебурнет»
+          # =============================================
+          echo "" >> combined.txt
+          echo "# ==========================================" >> combined.txt
+          echo "# RUSSIAN SERVERS (No Filter) – Cheburnet Fallback" >> combined.txt
+          echo "# ==========================================" >> combined.txt
+          
+          echo "" >> combined.txt
+          echo "# --- RESCUE: All White-Lists (including RU) ---" >> combined.txt
+          curl -s "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt" >> combined.txt
       
       - name: Commit and push
         run: |
@@ -42,4 +70,3 @@ jobs:
           git add combined.txt
           git commit -m "Auto-update VPN list $(date)" || true
           git push origin main
-          
