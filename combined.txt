@@ -1,6 +1,6 @@
 # ==========================================
 # OPTIMIZED VPN LIST (Fast Ping)
-# Updated: 2026-06-02 10:46 UTC
+# Updated: 2026-06-02 16:45 UTC
 # ==========================================
 
 # --- TURBO: Germany, Finland, Netherlands, Poland ---
