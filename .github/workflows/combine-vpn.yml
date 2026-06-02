@@ -1,4 +1,4 @@
-name: Build Optimized VPN List
+name: ABSOLUTE ZERO — Автономный апдейт
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
             return 1
           }
           
-          # Функция для добавления секции (только если файл не пуст)
+          # Функция для добавления секций
           add_section() {
             local TITLE=$1
             local FILENAME=$2
@@ -47,38 +47,63 @@ jobs:
             fi
           }
           
-          # =============================================
-          # СОЗДАНИЕ ОПТИМИЗИРОВАННОГО ФАЙЛА
-          # =============================================
+          # Создаем чистый заголовочный файл
           echo "# ==========================================" > combined.txt
-          echo "# OPTIMIZED VPN LIST (Fast Ping)" >> combined.txt
+          echo "# ABSOLUTE ZERO MONOLITH VPN LIST" >> combined.txt
           echo "# Updated: $(date -u +"%Y-%m-%d %H:%M UTC")" >> combined.txt
           echo "# ==========================================" >> combined.txt
           
-          # --- ТОЛЬКО САМЫЕ БЫСТРЫЕ РЕГИОНЫ (Германия, Финляндия, Нидерланды, Польша) ---
-          download_with_fallback "turbo.txt" \
-            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" \
-            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Germany%7CFinland%7CNetherlands%7CPoland" \
+          # 1. Скачиваем базу VLESS Mobile
+          download_with_fallback "vless_raw.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt" \
             "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt"
-          add_section "TURBO: Germany, Finland, Netherlands, Poland" "turbo.txt"
           
-          # --- БЫСТРЫЕ РЕЗЕРВНЫЕ РЕГИОНЫ (Чехия, Швеция) ---
-          download_with_fallback "fast.txt" \
-            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" \
-            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt?filter=(?i)Czechia%7CSweden" \
-            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt"
-          add_section "FAST: Czechia, Sweden" "fast.txt"
-          
-          # --- РОССИЙСКИЕ СЕРВЕРЫ ДЛЯ ЧЕБУРНЕТА (без фильтров) ---
-          download_with_fallback "rescue.txt" \
+          # 2. Скачиваем базу Shadowsocks
+          download_with_fallback "ss_raw.txt" \
+            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt" \
+            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt" \
+            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS+All_RUS.txt"
+
+          # 3. Скачиваем Белые списки (Спасение при Чебурнете)
+          download_with_fallback "white_raw.txt" \
             "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
             "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
             "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt"
-          add_section "RESCUE: Russian servers for Cheburnet" "rescue.txt"
-      
-      - name: Commit and push
+
+          # Фильтруем основные базы (вытаскиваем только TURBO, FAST, RESCUE) без дубликатов
+          cat vless_raw.txt ss_raw.txt | grep -E "TURBO|FAST|RESCUE" | sort -u > fast_nodes.txt
+          add_section "ABSOLUTE ZERO: TURBO/FAST/RESCUE ELITE" "fast_nodes.txt"
+          
+          # Добавляем Белые Списки целиком (убираем дубликаты)
+          sort -u white_raw.txt -o rescue_nodes.txt
+          add_section "ABSOLUTE ZERO: WHITE LISTS FOR CHEBURNET" "rescue_nodes.txt"
+
+          # Финальная зачистка временного мусора
+          rm -f vless_raw.txt ss_raw.txt white_raw.txt fast_nodes.txt rescue_nodes.txt
+
+      - name: Commit and push to GitHub Pages
         run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add combined.txt
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update optimized VPN list $(date -u +"%Y-%m-%d %H:%M UTC")" && git push origin main)
+
+      - name: Залить на Яндекс.Диск через API
+        env:
+          YATOKEN: ${{ secrets.YADISK_TOKEN }}
+        run: |
+          if [ -z "$YATOKEN" ]; then echo "❌ Токен YADISK_TOKEN не найден в Secrets!"; exit 1; fi
+          
+          # Получаем официальный URL для загрузки в папку abzero на Диске
+          UPLOAD_URL=$(curl -s -H "Authorization: OAuth $YATOKEN" \
+            "https://cloud-api.yandex.net/v1/disk/resources/upload?path=abzero/combined.txt&overwrite=true" \
+            | jq -r '.href')
+          
+          if [ "$UPLOAD_URL" != "null" ] && [ -n "$UPLOAD_URL" ]; then
+            curl -s -X PUT -T combined.txt "$UPLOAD_URL"
+            echo "🚀 Робот успешно закинул файл на Яндекс.Диск!"
+          else
+            echo "❌ Ошибка API Яндекса. Убедись, что создал папку 'abzero' в корне своего Диска!"
+            exit 1
+          fi
