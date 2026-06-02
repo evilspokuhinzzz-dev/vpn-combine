@@ -1,6 +1,6 @@
 # ==========================================
 # ABSOLUTE ZERO MONOLITH VPN LIST
-# Updated: 2026-06-02 20:49 UTC
+# Updated: 2026-06-02 20:54 UTC
 # ==========================================
 
 # --- ABSOLUTE ZERO: WHITE LISTS FOR CHEBURNET ---
