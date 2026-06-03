@@ -3,13 +3,13 @@ name: ABSOLUTE ZERO — Автономный апдейт
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *' # Срабатывание каждые 6 часов
+    - cron: '0 */2 * * *'
 
 permissions:
   contents: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true" # Инженерная защита от принудительного удаления Node.js 20 платформой GitHub
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
@@ -17,151 +17,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download and combine VPN lists
+      - name: Fetch and Clean
         run: |
-          # Инициализируем чистые файлы
-          touch vless_raw.txt ss_raw.txt white_raw.txt combined_dirty.txt combined.txt
-          
-          # Прямая загрузка через raw.githubusercontent.com с имитацией браузера (защита от лимитов GitHub API)
+          # Используем curl с таймаутом, чтобы не зависать
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
           
-          echo "📥 Скачивание базы VLESS Mobile..."
-          curl -sS -H "User-Agent: $UA" -o vless_raw.txt "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt"
+          # Скачиваем файлы
+          curl -sS --max-time 30 -H "User-Agent: $UA" "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt" > vless.txt
+          curl -sS --max-time 30 -H "User-Agent: $UA" "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS+All_RUS.txt" > ss.txt
+          curl -sS --max-time 30 -H "User-Agent: $UA" "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt" > white.txt
           
-          echo "📥 Скачивание базы Shadowsocks/Hysteria/Trojan..."
-          curl -sS -H "User-Agent: $UA" -o ss_raw.txt "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS+All_RUS.txt"
+          # Фильтрация: оставляем только строки, начинающиеся строго с протокола
+          cat vless.txt ss.txt white.txt | tr -d '\r' | grep -E '^(vless|ss|trojan|hysteria2|vmess)://' | sort -u > combined.txt
           
-          echo "📥 Скачивание Белых списков..."
-          curl -sS -H "User-Agent: $UA" -o white_raw.txt "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt"
+          # Убираем лишние файлы
+          rm -f vless.txt ss.txt white.txt
 
-          # =============================================
-          # АГРЕГАЦИЯ, ФИЛЬТРАЦИЯ И ВАЛИДАЦИЯ КОНФИГОВ
-          # =============================================
-          
-          # Объединяем все сырые файлы в единый буфер
-          cat vless_raw.txt ss_raw.txt white_raw.txt > combined_dirty.txt
-          
-          # Сверхглубокая очистка:
-          # 1. tr -d '\r' — удаляет Windows-символы возврата каретки, ломающие парсинг на смартфонах Redmi.
-          # 2. grep -E '^(vless|ss|trojan|hysteria2)://' — пропускает строго валидные URI-строки протоколов.
-          # 3. sort -u — убирает дубликаты, снижая нагрузку на ОЗУ роутера и клиентских устройств.
-          tr -d '\r' < combined_dirty.txt | grep -E '^(vless|ss|trojan|hysteria2)://' | sort -u > combined.txt
-          
-          LINES_COUNT=$(wc -l < combined.txt)
-          echo "✅ Сформировано чистых конфигураций для Karing: $LINES_COUNT"
-          
-          # Защита от повреждения данных: если файл пуст, робот прерывает работу, не затирая старую рабочую базу
-          if [ "$LINES_COUNT" -eq 0 ]; then
-            echo "❌ КРИТИЧЕСКАЯ ОШИБКА: Итоговый файл пуст! Аварийная остановка системы."
-            exit 1
-          fi
-
-          # Вычищаем временный мусор
-          rm -f vless_raw.txt ss_raw.txt white_raw.txt combined_dirty.txt
-          
-      - name: Публикация в GitHub Pages
+      - name: Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add combined.txt
-          git commit -m "Zero-Touch Auto-Update: Сборка $(date +'%Y-%m-%d %H:%M') МСК" --allow-empty
+          git commit -m "Clean update $(date +'%Y-%m-%d %H:%M')" --allow-empty
           git push origin main --force
-          
-      - name: Синхронизация с Облаком Яндекс.Диск
-        env:
-          YATOKEN: ${{ secrets.YADISK_TOKEN }}
-        run: |
-          if [ -z "$YATOKEN" ]; then 
-            echo "⚠️ Переменная YADISK_TOKEN отсутствует в Secrets. Пропускаю синхронизацию с облаком."
-            exit 0
-          fi
-          
-          echo "🚀 Отправка резервной копии на Яндекс.Диск..."
-          # Автоматическое создание папки abzero, если её нет на Диске
-          curl -s -X PUT -H "Authorization: OAuth $YATOKEN" "https://cloud-api.yandex.net/v1/disk/resources?path=abzero" > /dev/null
-          
-          # Запрос URL-адреса для перезаписи файла
-          UPLOAD_URL=$(curl -s -H "Authorization: OAuth $YATOKEN" \
-            "https://cloud-api.yandex.net/v1/disk/resources/upload?path=abzero/combined.txt&overwrite=true" \
-            | jq -r '.href')
-          
-          if [ "$UPLOAD_URL" != "null" ] && [ -n "$UPLOAD_URL" ]; then
-            curl -s -X PUT -T combined.txt "$UPLOAD_URL"
-            echo "✅ Резервная копия успешно отправлена на Яндекс.Диск!"
-          else
-            echo "❌ Сбой API Яндекс.Диска при получении токена загрузки."
-            exit 1
-          fi
-            local TITLE=$1
-            local FILENAME=$2
-            
-            if [ -s "$FILENAME" ]; then
-              echo "" >> combined.txt
-              echo "# --- $TITLE ---" >> combined.txt
-              cat "$FILENAME" >> combined.txt
-              echo "✅ Section $TITLE added ($(wc -l < $FILENAME) lines)"
-            else
-              echo "⚠️ Section $TITLE is empty, skipping"
-            fi
-          }
-          
-          # Создаем чистый заголовочный файл
-          echo "# ==========================================" > combined.txt
-          echo "# ABSOLUTE ZERO MONOLITH VPN LIST" >> combined.txt
-          echo "# Updated: $(date -u +"%Y-%m-%d %H:%M UTC")" >> combined.txt
-          echo "# ==========================================" >> combined.txt
-          
-          # 1. Скачиваем базу VLESS Mobile
-          download_with_fallback "vless_raw.txt" \
-            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt" \
-            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_VLESS_RUS_mobile.txt" \
-            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_VLESS_RUS_mobile.txt"
-          
-          # 2. Скачиваем базу Shadowsocks
-          download_with_fallback "ss_raw.txt" \
-            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt" \
-            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_SS+All_RUS.txt" \
-            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS+All_RUS.txt"
-
-          # 3. Скачиваем Белые списки (Спасение при Чебурнете)
-          download_with_fallback "white_raw.txt" \
-            "https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
-            "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
-            "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt"
-
-                    # =============================================
-          # СБОРКА ПОЛНОГО МОНОЛИТА (БЕЗ ФИЛЬТРОВ)
-          # =============================================
-          # Склеиваем абсолютно все серверы из трех источников в один файл без дубликатов
-          cat vless_raw.txt ss_raw.txt white_raw.txt | sort -u > all_nodes.txt
-          add_section "ABSOLUTE ZERO: FULL MONOLITH LIST" "all_nodes.txt"
-
-          # Финальная зачистка временного мусора
-          rm -f vless_raw.txt ss_raw.txt white_raw.txt all_nodes.txt
-          
-      - name: Commit and push to GitHub Pages
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add combined.txt
-          git commit -m "Auto-update optimized VPN list" --allow-empty
-          git push origin main --force
-          
-      - name: Залить на Яндекс.Диск через API
-        env:
-          YATOKEN: ${{ secrets.YADISK_TOKEN }}
-        run: |
-          if [ -z "$YATOKEN" ]; then echo "❌ Токен YADISK_TOKEN не найден в Secrets!"; exit 1; fi
-          
-          # Получаем официальный URL для загрузки в папку abzero на Диске
-          UPLOAD_URL=$(curl -s -H "Authorization: OAuth $YATOKEN" \
-            "https://cloud-api.yandex.net/v1/disk/resources/upload?path=abzero/combined.txt&overwrite=true" \
-            | jq -r '.href')
-          
-          if [ "$UPLOAD_URL" != "null" ] && [ -n "$UPLOAD_URL" ]; then
-            curl -s -X PUT -T combined.txt "$UPLOAD_URL"
-            echo "🚀 Робот успешно закинул файл на Яндекс.Диск!"
-          else
-            echo "❌ Ошибка API Яндекса. Убедись, что создал папку 'abzero' в корне своего Диска!"
-            exit 1
-          fi
