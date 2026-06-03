@@ -71,17 +71,16 @@ jobs:
             "https://gcore.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt" \
             "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt"
 
-          # Фильтруем основные базы (вытаскиваем только TURBO, FAST, RESCUE) без дубликатов
-          cat vless_raw.txt ss_raw.txt | grep -E "TURBO|FAST|RESCUE" | sort -u > fast_nodes.txt
-          add_section "ABSOLUTE ZERO: TURBO/FAST/RESCUE ELITE" "fast_nodes.txt"
-          
-          # Добавляем Белые Списки целиком (убираем дубликаты)
-          sort -u white_raw.txt -o rescue_nodes.txt
-          add_section "ABSOLUTE ZERO: WHITE LISTS FOR CHEBURNET" "rescue_nodes.txt"
+                    # =============================================
+          # СБОРКА ПОЛНОГО МОНОЛИТА (БЕЗ ФИЛЬТРОВ)
+          # =============================================
+          # Склеиваем абсолютно все серверы из трех источников в один файл без дубликатов
+          cat vless_raw.txt ss_raw.txt white_raw.txt | sort -u > all_nodes.txt
+          add_section "ABSOLUTE ZERO: FULL MONOLITH LIST" "all_nodes.txt"
 
           # Финальная зачистка временного мусора
-          rm -f vless_raw.txt ss_raw.txt white_raw.txt fast_nodes.txt rescue_nodes.txt
-
+          rm -f vless_raw.txt ss_raw.txt white_raw.txt all_nodes.txt
+          
       - name: Commit and push to GitHub Pages
         run: |
           git config user.name "github-actions[bot]"
